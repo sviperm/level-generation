@@ -54,43 +54,45 @@ def generate_direction(grid_size: tuple[int, int], r: int, c: int):
     return rnd.choice(directions)
 
 
-def dig_dungeon(rows: int, cols: int, worms_num: Optional[int] = None) -> list[list[str]]:
-    grid = create_grid(rows, cols)
+def calc_max_rooms(level: int) -> int:
+    rooms = round(rnd.randint(0, 3) + 5 + level * round(rnd.random() + 2, 1))
+    return rooms
 
-    s_r, s_c = rows // 2, cols // 2
+
+def dig_dungeon(rooms: int, rows: int, cols: int, start_point: tuple[int, int], worms_num: Optional[int] = None) -> list[list[str]]:
+    grid = create_grid(rows, cols)
 
     if worms_num is None:
         worms_num = rnd.randrange(2, 5)
 
-    worms_path = {
-        2: (15, 20),
-        3: (10, 15),
-        4: (8, 12),
-    }
+    worms = [start_point for _ in range(worms_num)]
+    rooms_arr = [start_point]
 
-    # worm initiation
-    for _ in range(worms_num):
-        r, c = s_r, s_c
-        direction = None
-        min_path, max_path = worms_path[worms_num]
-        worm_path = rnd.randrange(min_path, max_path + 1)
+    worm_i = 0
+    while len(rooms_arr) < rooms:
+        r, c = worms[worm_i]
+        direction = generate_direction((rows, cols), r, c)
 
-        # worm digging
-        for i in range(worm_path):
-            direction = generate_direction((rows, cols), r, c)
+        if direction == 0:
+            r -= 1
+        elif direction == 1:
+            c += 1
+        elif direction == 2:
+            r += 1
+        elif direction == 3:
+            c -= 1
 
-            if direction == 0:
-                r -= 1
-            elif direction == 1:
-                c += 1
-            elif direction == 2:
-                r += 1
-            elif direction == 3:
-                c -= 1
+        grid[r][c] = ROOMS['room']
+        worms[worm_i] = r, c
 
-            grid[r][c] = ROOMS['room']
+        if (r, c) not in rooms_arr:
+            rooms_arr.append((r, c))
 
-    grid[s_r][s_c] = ROOMS['start']
+        worm_i = worm_i + 1 if (worms_num - 1 < worm_i) else 0
+
+    r, c = start_point
+
+    grid[r][c] = ROOMS['start']
     return grid
 
 
@@ -146,7 +148,7 @@ def get_secret_rooms(dungeon: list[list[str]]) -> dict[tuple[int, int], int]:
                     (0 <= cc < cols) and
                     (dungeon[cr][cc] != ROOMS['empty'])
                 ):
-                    if dungeon[cr][cc] == ROOMS['boss']:
+                    if dungeon[cr][cc] in (ROOMS['boss'], ROOMS['start']):
                         connections = 0
                         break
 
@@ -200,9 +202,6 @@ def get_boss_room(
     return boss_room_corr
 
 
-# def find_pattern(dungeon: list[list[str]], pattern: list[list[str]]) -> list[tuple[int, int]]:
-#     pass
-
 def calc_min_max_rooms(level: float) -> tuple[int, int]:
     _min = level * 2
     _max = _min * 2
@@ -210,21 +209,23 @@ def calc_min_max_rooms(level: float) -> tuple[int, int]:
     return round(temp * _min), round(temp * _max)
 
 
-def generate_dungeon(grid_size: tuple[int, int], seed: Optional[int] = None) -> list[list[str]]:
+def set_seed(seed: Optional[int] = None):
     if not seed:
         seed = rnd.randint(min_int, max_int)
 
     print(f'Seed: {seed}')
     rnd.seed(seed)
 
+
+def generate_dungeon(level: int, grid_size: tuple[int, int]) -> list[list[str]]:
     rows, cols = grid_size
-    # min_rooms, max_rooms = calc_min_max_rooms(level)
+    rooms = calc_max_rooms(level)
+    print(rooms)
+
+    start_point = (rows // 2, cols // 2)
 
     while True:
-        dungeon = dig_dungeon(rows, cols)
-        rooms_num = get_dungeon_stats(dungeon)['rooms']
-        if not (16 <= rooms_num <= 26):
-            continue
+        dungeon = dig_dungeon(rooms, rows, cols, start_point)
 
         end_rooms = get_end_rooms(dungeon)
         if len(end_rooms) < 3:
@@ -264,48 +265,11 @@ def generate_dungeon(grid_size: tuple[int, int], seed: Optional[int] = None) -> 
 
 
 if __name__ == "__main__":
-    # level = 1
     grid_size = (15, 15)
     seed = None
-    # seed = -8084925685050141357
+    seed = 1502412782448117756
+    set_seed(seed)
 
-    for _ in range(15):
-        dungeon = generate_dungeon(grid_size, seed)
+    for level in range(1, 10):
+        dungeon = generate_dungeon(level, grid_size)
         visualize_dungeon(dungeon)
-
-    # for l in [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5]:
-    #     _min, _max = zip(*[calc_min_max_rooms(l) for _ in range(1000)])
-    #     print(f'Level: {l}')
-    #     for p in [5, 10, 25, 50, 75, 90, 95]:
-    #         print(f'{p}%\tMin: {np.percentile(_min, p)}\tMax: {np.percentile(_max, p)}')
-    #     print()
-
-    #     paths.append(boss_path)
-
-    # print('Boss path')
-    # for p in [5, 10, 25, 50, 75, 90, 95]:
-    #     print(f'{p}% {np.percentile(paths, p)}')
-    # print('---------')
-
-    # visualize_dungeon(dungeon)
-    # print()
-    # visualize_dungeon(bosses)
-
-    # rooms: dict[int, list[int]] = {
-    #     2: [],
-    #     3: [],
-    #     4: [],
-    # }
-
-    # iters = 1000
-    # for _ in tqdm(range(iters), total=iters):
-    #     for i in range(2, 5):
-    #         dungeon = dig_dungeon(grid)
-    #         rooms_num = get_dungeon_stats(dungeon)['rooms']
-    #         rooms[i].append(rooms_num)
-
-    # for k, v in rooms.items():
-    #     print(f'Worms: {k}')
-    #     for p in [5, 10, 25, 50, 75, 90, 95]:
-    #         print(f'{p}% {np.percentile(v, p)}')
-    #     print('---------')
